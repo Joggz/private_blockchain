@@ -11,7 +11,7 @@
 
 const SHA256 = require("crypto-js/sha256");
 const hex2ascii = require("hex2ascii");
-const { resolve } = require("path/posix");
+// const { resolve } = require("path/posix");
 
 class Block {
   // Constructor - argument data will be the object containing the transaction data
@@ -68,7 +68,8 @@ class Block {
   getBData() {
     // Getting the encoded data saved in the Block
     return new Promise((resolve, reject) => {
-      let data = this.body;
+      let self = this;
+      let data = self.body;
       let blockDecoded = hex2ascii(data);
       let blockdata = JSON.parse(blockDecoded);
       if (blockdata.data != "Genesis Block") {
