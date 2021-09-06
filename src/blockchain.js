@@ -11,6 +11,7 @@
 const SHA256 = require("crypto-js/sha256");
 const BlockClass = require("./block.js");
 const bitcoinMessage = require("bitcoinjs-message");
+const hex2ascii = require("hex2ascii");
 
 class Blockchain {
   /**
@@ -65,13 +66,35 @@ class Blockchain {
     let blockHash;
     return new Promise(async (resolve, reject) => {
       if (self.height === -1) {
-        self.previousBlockHash = null;
-        self.timestamp = +new Date();
+        let b = new BlockClass.Block({ data: block });
+        b.time = +new Date();
+        b.height++;
+
+        b.previousBlockHash = null;
+        b.hash = SHA256(b);
+        b.height++;
+        // self.previousBlockHash = null;
+        // self.timestamp = +new Date();
+        // self.height++;
+        // blockHash = SHA256(block);
+        // block.hash = blockHash;
+        self.chain.push(b);
         self.height++;
-        blockHash = SHA256(block.body);
-        block.hash = blockHash;
-        self.chain.push(block);
+        resolve(b);
       }
+      if (self.height > -1) {
+        let b = new BlockClass.Block({ data: block });
+        b.time = +new Date();
+        b.height++;
+        b.hash = SHA256(b);
+        b.height++;
+        let l = self.chain.length - 1;
+        b.previousBlockHash = self.chain[l].hash;
+        self.chain.push(b);
+        resolve(b);
+      }
+
+      reject("some error shas");
     });
   }
 
@@ -84,13 +107,15 @@ class Blockchain {
    * @param {*} address
    */
   requestMessageOwnershipVerification(address) {
-    return new Promise(
-      (resolve) =>
-        `${address}:${new Date()
-          .getTime()
-          .toString()
-          .slice(0, -3)}:starRegistry)`
-    );
+    let ownership;
+    return new Promise((resolve) => {
+      ownership = `${address}:${new Date()
+        .getTime()
+        .toString()
+        .slice(0, -3)}:starRegistry)`;
+
+      resolve(ownership);
+    });
   }
 
   /**
@@ -117,11 +142,15 @@ class Blockchain {
       let currentTime = parseInt(new Date().getTime().toString().slice(0, -3));
       let timestampDiff = currentTime - blockinit;
 
-      if (Math.floor(timestampDiff / 60 < 5)) {
+      let diff = blockinit - currentTime;
+      if (diff < 5) {
         bitcoinMessage.verify(message, address, signature);
-        resolve(self._addBlock(star));
+        star.ownerAddress = SHA256(address);
+        let staradded = self._addBlock(star);
+        resolve(staradded);
       }
-      reject(new Error("nit verified"));
+
+      reject(new Error("not verified"));
     });
   }
 
@@ -170,7 +199,23 @@ class Blockchain {
   getStarsByWalletAddress(address) {
     let self = this;
     let stars = [];
-    return new Promise((resolve, reject) => {});
+    return new Promise((resolve, reject) => {
+      try {
+        this.chain.map((star, i) => {
+          let add = hex2ascii(stars.ownerAddress);
+          if (add !== address) {
+            stars.push(star);
+          }
+        });
+        resolve(stars);
+
+        if (this.chain.length >= 1 && add !== address) {
+          reject("none star from this address");
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   /**
@@ -182,7 +227,46 @@ class Blockchain {
   validateChain() {
     let self = this;
     let errorLog = [];
-    return new Promise(async (resolve, reject) => {});
+    return new Promise(async (resolve, reject) => {
+      try {
+        self.forEach((element, i) => {
+          if (element.previousBlockchain !== null) {
+            let validateBlock = element.validate();
+            let validateBlockHash =
+              element.previousBlockchain == SHA256(element[i - 1].body);
+
+            if (validateBlockHash && validateBlock) {
+              console.log(
+                `both ${validateBlock} and ${validateBlockHash} are true`
+              );
+            } else {
+              errorLog.push(
+                `element ${element} at ${i} has been tampered with`
+              );
+            }
+          }
+
+          resolve(errorLog);
+        });
+
+        // self.forEach((element, i) => {
+        //   if (element.previousBlockHash !== null) {
+        //     let validateBlock = await element.validate();
+        //     let validateBlockHash = element === hex2ascii(previousBlockHash);
+
+        //     if (validateBlock && validateBlockHash) {
+        //     } else {
+        //       errorLog.push(
+        //         `element ${element} at ${i} has been tampered with`
+        //       );
+        //     }
+        //   }
+        //   resolve(errorLog);
+        // });
+      } catch (error) {
+        reject("something is rejected");
+      }
+    });
   }
 }
 
